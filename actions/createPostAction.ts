@@ -1,29 +1,32 @@
 'use server'
 
 import { AddPostRequestBody } from '@/app/api/posts/route'
+import generateSASToken, { containerName } from '@/lib/generateSASToken'
+
 import { Post } from '@/mongodb/models/post'
 import { IUser } from '@/types/user'
-import { auth, currentUser } from '@clerk/nextjs/server'
+import { BlobServiceClient } from '@azure/storage-blob'
+import { currentUser } from '@clerk/nextjs/server'
+import { randomUUID } from 'crypto'
+import { revalidatePath } from 'next/cache'
 
 export default async function createPostAction(formData: FormData) {
-	//Clerk authentication
 	const user = await currentUser()
-	if (!user) {
+	const postInput = formData.get('postInput') as string
+	const image = formData.get('image') as File
+	let image_url = undefined
+
+	console.log(postInput)
+	console.log(image)
+
+	if (!postInput) {
+		throw new Error('Post input is required')
+	}
+
+	if (!user?.id) {
 		throw new Error('User not authenticated')
 	}
 
-	//auth().protect() //protect the route
-
-	// Get the post input and image from the form data
-	const postInput = formData.get('postInput') as string
-	const image = formData.get('image') as File
-	let imageUrl: string | undefined
-
-	if (!postInput.trim()) {
-		throw new Error('Please, Post text is required')
-	}
-
-	//define user --> IUser
 	const userDB: IUser = {
 		userId: user.id,
 		userImage: user.imageUrl,
@@ -32,18 +35,40 @@ export default async function createPostAction(formData: FormData) {
 	}
 
 	try {
-		//upload image if there is one
 		if (image.size > 0) {
-			// 1. upload image if there is one -- MS blob storage
-			// 2. create post in database with image
+			console.log('Uploading image to Azure Blob Storage...', image)
+
+			const accountName = process.env.AZURE_STORAGE_NAME
+
+			const sasToken = await generateSASToken()
+
+			const blobServiceClient = new BlobServiceClient(
+				`https://${accountName}.blob.core.windows.net?${sasToken}`
+			)
+
+			const containerClient =
+				blobServiceClient.getContainerClient(containerName)
+
+			// generate current timestamp
+			const timestamp = new Date().getTime()
+			const file_name = `${randomUUID()}_${timestamp}.png`
+
+			const blockBlobClient = containerClient.getBlockBlobClient(file_name)
+
+			const imageBuffer = await image.arrayBuffer()
+			const res = await blockBlobClient.uploadData(imageBuffer)
+			image_url = res._response.request.url
+
+			console.log('File uploaded successfully!', image_url)
+
 			const body: AddPostRequestBody = {
 				user: userDB,
 				text: postInput,
-				imageUrl: imageUrl
+				imageUrl: image_url
 			}
-			// await Post.create(body)
+
+			await Post.create(body)
 		} else {
-			// 1. create post in database without image
 			const body: AddPostRequestBody = {
 				user: userDB,
 				text: postInput
@@ -51,22 +76,11 @@ export default async function createPostAction(formData: FormData) {
 
 			await Post.create(body)
 		}
+		return 'Post created successfully'
 	} catch (error: any) {
-		throw new Error('Error creating post with image', error)
+		//throw new Error('Failed to create post', error)
+		return 'Error occurred creating Post...'
 	}
 
-	//create post
-
-	//revalidate home page '/'
-
-	const response = await fetch('/api/posts', {
-		method: 'POST',
-		body: formData
-	})
-
-	if (!response.ok) {
-		throw new Error('Error creating the post')
-	}
-
-	return response.json()
+	revalidatePath('/')
 }

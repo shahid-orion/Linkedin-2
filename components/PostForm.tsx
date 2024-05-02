@@ -6,9 +6,10 @@ import { Button } from './ui/button'
 import { ImageIcon, XIcon } from 'lucide-react'
 import { ChangeEvent, useRef, useState } from 'react'
 import createPostAction from '@/actions/createPostAction'
+import { toast } from 'sonner'
 
 const PostForm = () => {
-	const { user } = useUser()
+	const { user, isSignedIn, isLoaded } = useUser()
 	//to manipulate the form elements
 	const ref = useRef<HTMLFormElement>(null)
 	const fileInputRef = useRef<HTMLInputElement>(null)
@@ -16,7 +17,7 @@ const PostForm = () => {
 	const [preview, setPreview] = useState<string | null>(null)
 
 	const handlePostAction = async (formData: FormData) => {
-		const formDataCopy = formData // Copy the form data
+		const formDataCopy = formData // Copy the form data ...why?
 		ref.current?.reset() // Reset the form after submission
 
 		const text = formDataCopy.get('postInput') as string // Get the post input
@@ -27,6 +28,7 @@ const PostForm = () => {
 		}
 
 		setPreview(null) // Reset the preview after submission
+		console.log(formDataCopy)
 
 		try {
 			await createPostAction(formDataCopy)
@@ -65,8 +67,13 @@ const PostForm = () => {
 				ref={ref}
 				action={(formData) => {
 					// Handle form submission with server action
-					handlePostAction(formData)
+					const promise = handlePostAction(formData)
 					// Toast notification based on the promise above
+					toast.promise(promise, {
+						loading: 'Creating post...',
+						success: 'Post created successfully',
+						error: 'Error creating the post'
+					})
 				}}
 				className="p-3 bg-white rounded-lg border"
 			>
@@ -111,7 +118,11 @@ const PostForm = () => {
 				)}
 
 				<div className="flex justify-end mt-2 space-x-2">
-					<Button type="button" onClick={() => fileInputRef.current?.click()}>
+					<Button
+						type="button"
+						variant={preview ? 'secondary' : 'outline'}
+						onClick={() => fileInputRef.current?.click()}
+					>
 						<ImageIcon className="mr-2" size={16} color="currentcolor" />
 						{preview ? 'Change' : 'Add'} image
 					</Button>

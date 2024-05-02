@@ -2,20 +2,25 @@ import { currentUser } from '@clerk/nextjs/server'
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 import { SignInButton, SignOutButton, SignedIn, SignedOut } from '@clerk/nextjs'
 import { Button } from './ui/button'
+import { IPostDocument } from '@/mongodb/models/post'
 
-type Props = {}
-
-const UserInformation = async (props: Props) => {
+async function UserInformation({ posts }: { posts: IPostDocument[] }) {
 	const user = await currentUser()
-	const firstName = user?.firstName
-	const lastName = user?.lastName
+	const firstName = user?.firstName as string
+	const lastName = user?.lastName as string
+	const imageUrl = user?.imageUrl as string
+
+	const userPosts = posts?.filter((post) => post.user.userId === user?.id)
+	// const userComments = posts.flatMap(
+	// 	(comment) => comment.user.userId === user?.id || []
+	// )
 
 	return (
 		<div className="flex flex-col justify-center items-center bg-white mr-6 rounded-lg border py-4">
-			<Avatar>
+			<Avatar className="h-16 w-16 mb-5">
 				{user?.id ? (
 					<>
-						<AvatarImage src={user?.imageUrl} />
+						<AvatarImage src={imageUrl} />
 
 						<AvatarFallback>
 							{firstName?.charAt(0)}
@@ -43,16 +48,22 @@ const UserInformation = async (props: Props) => {
 					</Button>
 				</div>
 			</SignedOut>
-			<hr className="w-full border-gray-200 my-5" />
 
-			<div className="flex justify-between w-full px-4 text-sm">
-				<p className="font-semibold text-gray-400">Posts</p>
-				<p className="text-blue-400">0</p>
-			</div>
-			<div className="flex justify-between w-full px-4 text-sm">
-				<p className="font-semibold text-gray-400">Comments</p>
-				<p className="text-blue-400">0</p>
-			</div>
+			<SignedIn>
+				<hr className="w-full border-gray-200 my-5" />
+
+				<div className="flex justify-between w-full px-4 text-sm">
+					<p className="font-semibold text-gray-400">Posts</p>
+					{/* <p className="text-blue-400">{userPosts.length}</p> */}
+					<p className="text-blue-400">0</p>
+				</div>
+
+				<div className="flex justify-between w-full px-4 text-sm">
+					<p className="font-semibold text-gray-400">Comments</p>
+					{/* <p className="text-blue-400">{userComments.length}</p> */}
+					<p className="text-blue-400">0</p>
+				</div>
+			</SignedIn>
 		</div>
 	)
 }

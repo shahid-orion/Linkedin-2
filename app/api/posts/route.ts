@@ -10,13 +10,13 @@ export interface AddPostRequestBody {
 	text: string
 	imageUrl?: string | null
 }
-export const POST = async (req: NextRequest, res: NextResponse) => {
+export async function POST(req: NextRequest, res: NextResponse) {
 	//to protect this route with authentication
 	// auth().protect()
 
+	const { user, text, imageUrl }: AddPostRequestBody = await req.json()
 	try {
 		await connectDB() //connecting to mongodb server
-		const { user, text, imageUrl }: AddPostRequestBody = await req.json()
 
 		const postData: IPostBase = { user, text, ...(imageUrl && { imageUrl }) }
 
@@ -31,7 +31,7 @@ export const POST = async (req: NextRequest, res: NextResponse) => {
 	}
 }
 
-export const GET = async (req: NextRequest, res: NextResponse) => {
+export async function GET(req: NextRequest, res: NextResponse) {
 	//to protect this route with authentication
 	// auth().protect()
 	try {
@@ -39,7 +39,7 @@ export const GET = async (req: NextRequest, res: NextResponse) => {
 
 		const posts = await Post.getAllPosts()
 
-		return NextResponse.json({ posts })
+		return NextResponse.json(posts)
 	} catch (error) {
 		return NextResponse.json(
 			{ error: 'An error occurred while fetching posts' },
